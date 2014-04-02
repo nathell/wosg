@@ -1,7 +1,8 @@
-function Tile(position, value) {
+function Tile(position, letter) {
   this.x                = position.x;
   this.y                = position.y;
-  this.value            = value || 2;
+  this.letter           = letter;
+  this.value            = GameManager.letters[letter].value;
 
   this.previousPosition = null;
   this.mergedFrom       = null; // Tracks tiles that merged together

@@ -21,7 +21,7 @@ HTMLActuator.prototype.actuate = function (grid, metadata) {
       });
     });
 
-    self.updateScore(metadata.score);
+    self.updateScore(metadata.score, metadata.addedWords);
     self.updateBestScore(metadata.bestScore);
 
     if (metadata.terminated) {
@@ -62,7 +62,7 @@ HTMLActuator.prototype.addTile = function (tile) {
   this.applyClasses(wrapper, classes);
 
   inner.classList.add("tile-inner");
-  inner.textContent = tile.value;
+  inner.innerHTML = tile.letter + "<span class='letterValue'>" + tile.value + "</span>";
 
   if (tile.previousPosition) {
     // Make sure that the tile gets rendered in the previous position first
@@ -103,7 +103,7 @@ HTMLActuator.prototype.positionClass = function (position) {
   return "tile-position-" + position.x + "-" + position.y;
 };
 
-HTMLActuator.prototype.updateScore = function (score) {
+HTMLActuator.prototype.updateScore = function (score, addedWords) {
   this.clearContainer(this.scoreContainer);
 
   var difference = score - this.score;
@@ -114,7 +114,10 @@ HTMLActuator.prototype.updateScore = function (score) {
   if (difference > 0) {
     var addition = document.createElement("div");
     addition.classList.add("score-addition");
-    addition.textContent = "+" + difference;
+    addition.innerHTML = "+" + difference;
+    addedWords.forEach(function(x) {
+      addition.innerHTML += "<br>" + x.word;
+    });
 
     this.scoreContainer.appendChild(addition);
   }

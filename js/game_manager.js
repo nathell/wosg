@@ -41,6 +41,7 @@ GameManager.prototype.setup = function () {
   this.over        = false;
   this.won         = false;
   this.keepPlaying = false;
+  this.addedWords  = [];
 
   // Add the initial tiles
   this.addStartTiles();
@@ -56,11 +57,54 @@ GameManager.prototype.addStartTiles = function () {
   }
 };
 
+GameManager.letters = {
+    A: {value: 1, count: 9},
+    B: {value: 3, count: 2},
+    C: {value: 3, count: 2},
+    D: {value: 2, count: 4},
+    E: {value: 1, count:12},
+    F: {value: 4, count: 2},
+    G: {value: 2, count: 3},
+    H: {value: 4, count: 2},
+    I: {value: 1, count: 9},
+    J: {value: 8, count: 1},
+    K: {value: 5, count: 1},
+    L: {value: 1, count: 2},
+    M: {value: 3, count: 2},
+    N: {value: 1, count: 6},
+    O: {value: 1, count: 8},
+    P: {value: 3, count: 2},
+    Q: {value:10, count: 1},
+    R: {value: 1, count: 6},
+    S: {value: 1, count: 4},
+    T: {value: 1, count: 6},
+    U: {value: 1, count: 4},
+    V: {value: 4, count: 2},
+    W: {value: 4, count: 2},
+    X: {value: 8, count: 1},
+    Y: {value: 4, count: 2},
+    Z: {value:10, count: 1},
+};
+
+String.prototype.repeat = function(times) {
+   return (new Array(times + 1)).join(this);
+};
+
+String.prototype.randomChar = function() {
+    return this[Math.floor(Math.random() * this.length)];
+};
+
+GameManager.letterDist = "";
+for (var letter in GameManager.letters) {
+    GameManager.letterDist += letter.repeat(GameManager.letters[letter].count);
+}
+
 // Adds a tile in a random position
 GameManager.prototype.addRandomTile = function () {
   if (this.grid.cellsAvailable()) {
     var value = Math.random() < 0.9 ? 2 : 4;
-    var tile = new Tile(this.grid.randomAvailableCell(), value);
+    var letter = "Q";
+    var tile = new Tile(this.grid.randomAvailableCell(), GameManager.letterDist.randomChar());
 
     this.grid.insertTile(tile);
   }
@@ -77,7 +121,8 @@ GameManager.prototype.actuate = function () {
     over:       this.over,
     won:        this.won,
     bestScore:  this.scoreManager.get(),
-    terminated: this.isGameTerminated()
+    terminated: this.isGameTerminated(),
+    addedWords: this.addedWords
   });
 
 };
@@ -98,6 +143,76 @@ GameManager.prototype.moveTile = function (tile, cell) {
   this.grid.cells[cell.x][cell.y] = tile;
   tile.updatePosition(cell);
 };
+
+GameManager.prototype.gatherWords = function(x, y, horizontal) {
+  var words = [], cell = this.grid.cells[x][y];
+  if (!cell)
+    return words;
+  var current = ""; 
+  while (x < this.size && y < this.size && cell) {
+    current += cell.letter;
+    words.push(current);
+    if (horizontal) x++; else y++;
+    if (x < this.size && y < this.size) 
+        cell = this.grid.cells[x][y];
+  }
+  return words;
+}
+
+GameManager.prototype.scoreWord = function(word) {
+  var score = 0;
+  for (i = 0; i < word.length; i++)
+    score += GameManager.letters[word[i].toUpperCase()].value;
+  if (word.length == 4)
+    score += 10;
+  if (word.length == 5)
+    score += 30;
+  return score;
+}
+
+GameManager.prototype.clearGrid = function() {
+  var self = this;
+  var toClear = [];
+  for (var y = 0; y < this.size; y++) {
+    for (var x = 0; x < this.size - 2; x++) {
+      words = this.gatherWords(x, y, true);
+      for (var i = words.length - 1; i >= 0; i--) {
+        var word = words[i].toLowerCase();
+        if (dictionary[word]) {
+          toClear.push({x: x, y: y, word: word, dir: true});
+          break;
+        }
+      }
+    }
+  }
+
+  for (var y = 0; y < this.size - 2; y++) {
+    for (var x = 0; x < this.size; x++) {
+      words = this.gatherWords(x, y, false);
+      for (var i = words.length - 1; i >= 0; i--) {
+        var word = words[i].toLowerCase();
+        if (dictionary[word]) {
+          toClear.push({x: x, y: y, word: word, dir: false});
+          break;
+        }
+      }
+    }
+  }
+
+    
+  for (var i = 0; i < toClear.length; i++) {
+    var word = toClear[i].word, x = toClear[i].x, y = toClear[i].y, dir = toClear[i].dir;
+    this.score += this.scoreWord(toClear[i].word);
+    for (var j = 0; j < word.length; j++) {
+      this.grid.removeTile({x: x, y: y});
+      if (dir) x++; else y++;
+    }
+  }    
+
+  this.addedWords = toClear;
+
+  return toClear;
+}
 
 // Move tiles on the grid in the specified direction
 GameManager.prototype.move = function (direction) {
@@ -126,7 +241,7 @@ GameManager.prototype.move = function (direction) {
         var next      = self.grid.cellContent(positions.next);
 
         // Only one merger per row traversal?
-        if (next && next.value === tile.value && !next.mergedFrom) {
+        if (false /* next && next.value === tile.value && !next.mergedFrom */) {
           var merged = new Tile(positions.next, tile.value * 2);
           merged.mergedFrom = [tile, next];
 
@@ -151,6 +266,8 @@ GameManager.prototype.move = function (direction) {
       }
     });
   });
+
+  self.clearGrid();
 
   if (moved) {
     this.addRandomTile();
@@ -209,7 +326,7 @@ GameManager.prototype.findFarthestPosition = function (cell, vector) {
 };
 
 GameManager.prototype.movesAvailable = function () {
-  return this.grid.cellsAvailable() || this.tileMatchesAvailable();
+  return this.grid.cellsAvailable() /* || this.tileMatchesAvailable() */;
 };
 
 // Check for available matches between tiles (more expensive check)
